@@ -126,11 +126,81 @@ jobs:
   plan:
     needs: [validar, politicas]
     runs-on: ubuntu-latest
+
     steps:
-      - name: Sin implementar
+      - name: Descargar codigo
+        uses: actions/checkout@v4
+
+      - name: Preparar Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Inicializar Terraform
+        working-directory: infra
+        run: terraform init -backend-config=backend.hcl
+
+      - name: Calcular plan
+        working-directory: infra
+        run: terraform plan -out=tfplan
+
+      - name: Exportar plan
+        working-directory: infra
         run: |
-          echo "::error::El job 'plan' no esta implementado."
-          exit 1
+          terraform show -json tfplan > tfplan.json
+          terraform show -no-color tfplan > plan.txt
+
+      - name: Mostrar plan en el resumen
+        working-directory: infra
+        run: |
+          {
+            echo "## Terraform Plan"
+            echo ""
+            echo '```'
+            cat plan.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verificar destrucciones
+        working-directory: infra
+        env:
+          AUTORIZAR_DESTRUCCION: ${{ inputs.autorizar_destruccion }}
+        run: |
+          DESTRUCCIONES=$(jq '
+            [
+              .resource_changes[]?
+              | select(.change.actions | index("delete"))
+            ]
+            | length
+          ' tfplan.json)
+
+          echo "Recursos con acción delete: ${DESTRUCCIONES}"
+
+          if [ "$DESTRUCCIONES" -gt 0 ]; then
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ] && \
+               [ "$AUTORIZAR_DESTRUCCION" = "true" ]; then
+              echo "Destrucción autorizada manualmente."
+            else
+              echo "::error::El plan contiene destrucciones no autorizadas."
+              exit 1
+            fi
+          fi
+
+      - name: Guardar plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: |
+            infra/tfplan
+            infra/tfplan.json
+            infra/plan.txt
+          if-no-files-found: error
 
   # TODO
   # Aplicar el plan que produjo el job anterior, sin recalcularlo.
