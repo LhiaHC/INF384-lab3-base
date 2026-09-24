@@ -13,6 +13,12 @@ on:
     paths:
       - 'infra/**'
   workflow_dispatch:
+    inputs:
+      autorizar_destruccion:
+        description: 'Autorizar explícitamente acciones de destrucción'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
 
