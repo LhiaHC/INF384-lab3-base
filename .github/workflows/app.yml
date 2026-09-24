@@ -72,13 +72,31 @@ jobs:
   # Cloud y se lee ahi.
   #
   # Sustituir el paso centinela por la implementacion.
+
   calidad:
+    needs: pruebas
     runs-on: ubuntu-latest
     steps:
-      - name: Sin implementar
-        run: |
-          echo "::error::El job 'calidad' no esta implementado."
-          exit 1
+      - name: Descargar codigo con historial completo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Descargar reporte de cobertura
+        uses: actions/download-artifact@v4
+        with:
+          name: cobertura
+          path: coverage
+
+      - name: Analizar con SonarQube Cloud
+        uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          args: >
+            -Dsonar.organization=${{ vars.SONAR_ORG }}
+            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
 
   # TODO
   # Buscar credenciales escritas en el codigo y en el historial del repositorio.
@@ -95,10 +113,15 @@ jobs:
   secretos:
     runs-on: ubuntu-latest
     steps:
-      - name: Sin implementar
-        run: |
-          echo "::error::El job 'secretos' no esta implementado."
-          exit 1
+      - name: Descargar codigo con historial completo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Buscar secretos
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # TODO
   # Contrastar el arbol de dependencias declarado en package-lock.json contra
@@ -116,10 +139,17 @@ jobs:
   dependencias:
     runs-on: ubuntu-latest
     steps:
-      - name: Sin implementar
-        run: |
-          echo "::error::El job 'dependencias' no esta implementado."
-          exit 1
+      - name: Descargar codigo
+        uses: actions/checkout@v4
+
+      - name: Analizar dependencias
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: package-lock.json
+          scanners: vuln
+          format: table
+          exit-code: '0'
 
   # TODO
   # Buscar patrones explotables en el codigo fuente.
@@ -131,10 +161,22 @@ jobs:
   estatico:
     runs-on: ubuntu-latest
     steps:
-      - name: Sin implementar
+      - name: Descargar codigo
+        uses: actions/checkout@v4
+
+      - name: Analizar el codigo fuente
         run: |
-          echo "::error::El job 'estatico' no esta implementado."
-          exit 1
+          docker run --rm \
+            --volume "${PWD}:/src" \
+            --workdir /src \
+            --env SEMGREP_SEND_METRICS=off \
+            semgrep/semgrep \
+            semgrep scan \
+            --config=p/default \
+            --config=p/javascript \
+            --json --quiet \
+            --output=semgrep.json \
+            src/
 
   # TODO
   # Construir la imagen de la aplicacion y publicarla en el registro privado.
