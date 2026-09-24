@@ -209,13 +209,90 @@ jobs:
   #   digest: # TODO
   #
   # Sustituir el paso centinela por la implementacion.
-  publicar:
+    publicar:
+    needs: [calidad, secretos, dependencias, estatico]
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+
+    outputs:
+      digest: ${{ steps.salida.outputs.digest }}
+
+    env:
+      AWS_REGION: us-east-1
+      APLICACION: inf384-lab3
+
     steps:
-      - name: Sin implementar
+      - name: Descargar codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login en Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Preparar datos de imagen
+        id: meta
         run: |
-          echo "::error::El job 'publicar' no esta implementado."
-          exit 1
+          SHA_CORTO="${GITHUB_SHA::7}"
+          IMAGEN="${{ steps.login-ecr.outputs.registry }}/${APLICACION}"
+
+          echo "sha=${SHA_CORTO}" >> "$GITHUB_OUTPUT"
+          echo "imagen=${IMAGEN}" >> "$GITHUB_OUTPUT"
+
+      - name: Construir imagen
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            --label "org.opencontainers.image.title=${APLICACION}" \
+            -t "${{ steps.meta.outputs.imagen }}:${{ steps.meta.outputs.sha }}" \
+            .
+
+      - name: Publicar imagen con tag SHA
+        id: push
+        run: |
+          set -o pipefail
+
+          IMAGEN="${{ steps.meta.outputs.imagen }}"
+          SHA="${{ steps.meta.outputs.sha }}"
+
+          docker push "${IMAGEN}:${SHA}" 2>&1 | tee push.txt
+
+          DIGEST="$(grep 'digest:' push.txt | tail -1 | awk '{print $3}')"
+
+          if [ -z "$DIGEST" ]; then
+            echo "::error::No se pudo obtener el digest de la imagen."
+            exit 1
+          fi
+
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+
+      - name: Publicar tag prd
+        run: |
+          IMAGEN="${{ steps.meta.outputs.imagen }}"
+          SHA="${{ steps.meta.outputs.sha }}"
+
+          docker tag "${IMAGEN}:${SHA}" "${IMAGEN}:prd"
+          docker push "${IMAGEN}:prd"
+
+      - name: Exponer digest
+        id: salida
+        run: |
+          URI="${{ steps.meta.outputs.imagen }}@${{ steps.push.outputs.digest }}"
+
+          echo "digest=${URI}" >> "$GITHUB_OUTPUT"
+
+          echo "## Imagen publicada" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tag SHA: \`${{ steps.meta.outputs.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tag ambiente: \`prd\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Digest: \`${URI}\`" >> "$GITHUB_STEP_SUMMARY"
 
   # Este job viene completo y no se modifica.
   # Las estrategias de despliegue y la verificacion posterior son contenido
