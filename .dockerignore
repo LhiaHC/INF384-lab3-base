@@ -1,0 +1,12 @@
+node_modules
+coverage
+dist
+.git
+.github
+infra
+test
+*.log
+*.md
+.env
+.env.*
+.dockerignore.ejemplo
