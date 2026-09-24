@@ -3,6 +3,8 @@ const { Cookie } = require('tough-cookie');
 const { obtenerVersion } = require('./version');
 
 const NOMBRE_COOKIE_SESION = 'inf384_sesion';
+// inyección de falla
+const TEST_DATABASE_PASSWORD = "Lab3-falla-asdasdasdasdasd";
 
 // Lee el marcador de sesion de las cabeceras del evento.
 // Devuelve null cuando la cabecera no existe, no es analizable
