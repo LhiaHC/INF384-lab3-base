@@ -75,11 +75,20 @@ jobs:
   # Sustituir el paso centinela por la implementacion.
   politicas:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Sin implementar
-        run: |
-          echo "::error::El job 'politicas' no esta implementado."
-          exit 1
+      - name: Descargar codigo
+        uses: actions/checkout@v4
+
+      - name: Analizar politicas de infraestructura
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: config
+          scan-ref: infra
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+          format: table
+          cache: 'false'
 
   # TODO
   # Calcular el plan, guardarlo en disco y exportarlo a tfplan.json.
