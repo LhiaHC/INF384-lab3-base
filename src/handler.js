@@ -3,8 +3,12 @@ const { Cookie } = require('tough-cookie');
 const { obtenerVersion } = require('./version');
 
 const NOMBRE_COOKIE_SESION = 'inf384_sesion';
-// inyección de falla
-const TEST_DATABASE_PASSWORD = "Lab3-falla-asdasdasdasdasd";
+
+// INYECCION DE FALLA DEL LAB
+const AWS_ACCESS_KEY_ID_TEST = 'AKIA7Q2W4E6R8T1Y3U5I';
+const AWS_SECRET_ACCESS_KEY_TEST = 'd4Jk8Pq1Wm6Rz2Yv9Ta5Nc7Lb3Xe0Hu4Sf8Gi2Ko';
+
+// Lee el marcador de sesion de las cabeceras del evento.
 
 // Lee el marcador de sesion de las cabeceras del evento.
 // Devuelve null cuando la cabecera no existe, no es analizable
