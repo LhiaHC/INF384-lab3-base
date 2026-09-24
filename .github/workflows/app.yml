@@ -209,7 +209,7 @@ jobs:
   #   digest: # TODO
   #
   # Sustituir el paso centinela por la implementacion.
-    publicar:
+  publicar:
     needs: [calidad, secretos, dependencias, estatico]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
